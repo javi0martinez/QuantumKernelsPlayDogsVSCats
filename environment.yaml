@@ -1,5 +1,6 @@
 name: QuantumKernelsPlayDogsVSCats
 channels:
+  - pytorch
   - conda-forge
   - defaults
 dependencies:
@@ -8,7 +9,8 @@ dependencies:
   - pandas
   - matplotlib
   - scikit-learn
-  - tensorflow
+  - pytorch::pytorch
+  - pytorch::torchvision
   - jupyter
   - pip
   - pip:
