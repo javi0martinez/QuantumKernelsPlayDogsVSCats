@@ -26,7 +26,9 @@ class DogsCatsDataset(Dataset):
         img = Image.open(img_path)
         img_transformed = self.transform(img) if self.transform else img
 
-        label = img_path.split("/")[-1].split(".")[0]
+        filename = os.path.basename(img_path)
+        label = filename.split(".")[0]
+
         if label == "dog":
             label = 1
         elif label == "cat":
