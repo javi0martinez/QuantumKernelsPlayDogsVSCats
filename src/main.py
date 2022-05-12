@@ -30,3 +30,8 @@ def main():
     train_loader, val_loader, test_loader = prepare_data_loaders(
         data_dir, batch_size, img_size
     )
+
+    # Train CNN
+    print("Training CNN...")
+    model = CnnFeatureExtractor().to(device)
+    model = train_cnn(model, train_loader, val_loader, device, learning_rate, epochs)
