@@ -35,3 +35,22 @@ def main():
     print("Training CNN...")
     model = CnnFeatureExtractor().to(device)
     model = train_cnn(model, train_loader, val_loader, device, learning_rate, epochs)
+
+    # Extract features using CNN
+    print("Extracting features...")
+    train_features = []
+    train_labels = []
+    val_features = []
+    val_labels = []
+
+    with torch.no_grad():
+        for data, label in train_loader:
+            _, features = model(data.to(device))
+            train_features.extend(features.cpu().numpy())
+            train_labels.extend(label.numpy())
+
+        for data, label in val_loader:
+            _, features = model(data.to(device))
+            val_features.extend(features.cpu().numpy())
+            val_labels.extend(label.numpy())
+
