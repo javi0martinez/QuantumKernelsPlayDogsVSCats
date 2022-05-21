@@ -54,3 +54,6 @@ def main():
             val_features.extend(features.cpu().numpy())
             val_labels.extend(label.numpy())
 
+    kernel, random_params = create_quantum_kernel()
+    init_params = random_params(num_wires=5, num_layers=3)
+
