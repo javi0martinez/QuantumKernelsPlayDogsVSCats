@@ -1,6 +1,15 @@
+"""
+Training utilities for both classical and quantum models.
+"""
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from pennylane import numpy as np
+from sklearn.svm import SVC
+import pennylane as qml
+
+
 def train_cnn(model, train_loader, val_loader, device, learning_rate=0.0001, epochs=5):
     """Train the CNN model."""
 
@@ -56,3 +65,78 @@ def train_cnn(model, train_loader, val_loader, device, learning_rate=0.0001, epo
 
     return model
 
+
+def train_quantum_kernel(
+    kernel,
+    X_train,
+    Y_train,
+    X_test,
+    Y_test,
+    init_params=None,
+    num_iterations=700,
+    learning_rate=0.2,
+    batch_size=8,
+):
+    """Train the quantum kernel."""
+
+    def target_alignment(
+        X, Y, kernel, assume_normalized_kernel=False, rescale_class_labels=True
+    ):
+        """Calculate the kernel target alignment."""
+        K = qml.kernels.square_kernel_matrix(
+            X, kernel, assume_normalized_kernel=assume_normalized_kernel
+        )
+
+        if rescale_class_labels:
+            nplus = np.count_nonzero(np.array(Y) == 1)
+            nminus = len(Y) - nplus
+            _Y = np.array([y / nplus if y == 1 else -1 / nminus for y in Y])
+        else:
+            _Y = np.array(Y)
+
+        T = np.outer(_Y, _Y)
+        inner_product = np.sum(K * T)
+        norm = np.sqrt(np.sum(K * K) * np.sum(T * T))
+        return inner_product / norm
+
+    opt = qml.GradientDescentOptimizer(learning_rate)
+
+    # Initialize parameters
+    if init_params is None:
+        raise ValueError("init_params must be provided")
+    params = init_params
+
+    # Optimization loop
+    for i in range(num_iterations):
+        # Select subset for batch training
+        subset = np.random.choice(list(range(len(X_train))), batch_size)
+
+        # Cost function (negative KTA)
+        cost = lambda _params: -target_alignment(
+            X_train[subset],
+            Y_train[subset],
+            lambda x1, x2: kernel(x1, x2, _params),
+            assume_normalized_kernel=True,
+        )
+
+        # Optimization step
+        params = opt.step(cost, params)
+
+        # Print progress
+        if (i + 1) % 50 == 0:
+            current_alignment = target_alignment(
+                X_train,
+                Y_train,
+                lambda x1, x2: kernel(x1, x2, params),
+                assume_normalized_kernel=True,
+            )
+            print(f"Step {i+1} - Alignment = {current_alignment:.3f}")
+
+    # Train SVM with optimized kernel
+    trained_kernel = lambda x1, x2: kernel(x1, x2, params)
+    trained_kernel_matrix = lambda X1, X2: qml.kernels.kernel_matrix(
+        X1, X2, trained_kernel
+    )
+    svm = SVC(kernel=trained_kernel_matrix).fit(X_train, Y_train)
+
+    return svm, trained_kernel

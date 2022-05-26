@@ -54,6 +54,16 @@ def main():
             val_features.extend(features.cpu().numpy())
             val_labels.extend(label.numpy())
 
+    # Train quantum kernel
     kernel, random_params = create_quantum_kernel()
     init_params = random_params(num_wires=5, num_layers=3)
+
+    svm, trained_kernel = train_quantum_kernel(
+        kernel,
+        train_features[:400],
+        train_labels[:400],
+        val_features[400:1400],
+        val_labels[400:1400],
+        init_params=init_params,
+    )
 
