@@ -106,6 +106,12 @@ def train_quantum_kernel(
         raise ValueError("init_params must be provided")
     params = init_params
 
+    # Convert to numpy arrays if needed
+    X_train = np.array(X_train)
+    Y_train = np.array(Y_train)
+    X_test = np.array(X_test)
+    Y_test = np.array(Y_test)
+
     # Optimization loop
     for i in range(num_iterations):
         # Select subset for batch training
