@@ -18,9 +18,8 @@ def create_quantum_kernel(num_wires=5, num_layers=3):
             qml.RY(params[0, j], wires=[wire])
             i += inc
 
-        qml.broadcast(
-            unitary=qml.CRZ, pattern="ring", wires=wires, parameters=params[1]
-        )
+        for j in range(len(wires)):
+            qml.CRZ(params[1, j], wires=[wires[j], wires[(j + 1) % len(wires)]])
 
     def ansatz(x, params, wires):
         """Build the quantum circuit."""
