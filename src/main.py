@@ -3,6 +3,8 @@ Main script to run the hybrid quantum-classical image classifier.
 """
 
 import os
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
 import torch
 from data.data_loading import prepare_data_loaders
 from models.cnn_model import CnnFeatureExtractor
