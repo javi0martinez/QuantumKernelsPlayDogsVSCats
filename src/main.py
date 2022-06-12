@@ -3,6 +3,7 @@ Main script to run the hybrid quantum-classical image classifier.
 """
 
 import os
+import argparse
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
 import torch
@@ -12,7 +13,7 @@ from models.quantum_kernel import create_quantum_kernel
 from utils.training import train_cnn, train_quantum_kernel
 
 
-def main():
+def main(retrain_cnn=False):
     """Main function to run the training and evaluation pipeline."""
 
     # Set device
@@ -33,10 +34,22 @@ def main():
         data_dir, batch_size, img_size
     )
 
-    # Train CNN
-    print("Training CNN...")
+    # Initialize model
     model = CnnFeatureExtractor().to(device)
-    model = train_cnn(model, train_loader, val_loader, device, learning_rate, epochs)
+    cnn_model_path = os.path.join("models", "classical", "cnn_model.pth")
+
+    # Load or train CNN
+    if not retrain_cnn and os.path.exists(cnn_model_path):
+        print(f"Loading pre-trained CNN from {cnn_model_path}...")
+        model.load_state_dict(torch.load(cnn_model_path))
+        model.eval()
+    else:
+        print("Training CNN...")
+        model = train_cnn(model, train_loader, val_loader, device, learning_rate, epochs)
+        # Save the trained model
+        print(f"Saving CNN model to {cnn_model_path}...")
+        os.makedirs(os.path.dirname(cnn_model_path), exist_ok=True)
+        torch.save(model.state_dict(), cnn_model_path)
 
     # Extract features using CNN
     print("Extracting features...")
@@ -69,3 +82,13 @@ def main():
         init_params=init_params,
     )
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Hybrid quantum-classical image classifier")
+    parser.add_argument(
+        "--retrain-cnn",
+        action="store_true",
+        help="Retrain the CNN model even if a saved model exists",
+    )
+    args = parser.parse_args()
+    
+    main(retrain_cnn=args.retrain_cnn)

@@ -1,4 +1,7 @@
 old/
 __pycache__/
 .vscode/
-*.jpg
+# Image files
+*.jpg 
+#  PyTorch model files
+*.pth 
