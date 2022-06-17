@@ -10,10 +10,10 @@ import torch
 from data.data_loading import prepare_data_loaders
 from models.cnn_model import CnnFeatureExtractor
 from models.quantum_kernel import create_quantum_kernel
-from utils.training import train_cnn, train_quantum_kernel
+from utils.training import train_cnn, train_quantum_kernel, predict_with_quantum_kernel
 
 
-def main(retrain_cnn=False):
+def main(retrain_cnn=False, retrain_quantum=False):
     """Main function to run the training and evaluation pipeline."""
 
     # Set device
@@ -69,18 +69,57 @@ def main(retrain_cnn=False):
             val_features.extend(features.cpu().numpy())
             val_labels.extend(label.numpy())
 
-    # Train quantum kernel
+    # Initialize or load quantum kernel
+    quantum_model_path = os.path.join("models", "quantum", "quantum_kernel.pth")
+    
+    # Create kernel function (needed for both loading and training)
     kernel, random_params = create_quantum_kernel()
-    init_params = random_params(num_wires=5, num_layers=3)
+    
+    # Load or train quantum kernel
+    if not retrain_quantum and os.path.exists(quantum_model_path):
+        print(f"Loading pre-trained quantum kernel from {quantum_model_path}...")
+        quantum_data = torch.load(quantum_model_path)
+        kernel_params = quantum_data["kernel_params"]
+        svm = quantum_data["svm_state"]
+        X_train_svm = quantum_data["X_train_svm"]
+    else:
+        print("Training quantum kernel...")
+        init_params = random_params(num_wires=5, num_layers=3)
 
-    svm, trained_kernel = train_quantum_kernel(
-        kernel,
-        train_features[:400],
-        train_labels[:400],
-        val_features[400:1400],
-        val_labels[400:1400],
-        init_params=init_params,
+        svm, kernel_params, X_train_svm = train_quantum_kernel(
+            kernel,
+            train_features[:400],
+            train_labels[:400],
+            val_features[400:1400],
+            val_labels[400:1400],
+            init_params=init_params,
+        )
+        
+        # Save the trained quantum kernel
+        print(f"\nSaving quantum kernel to {quantum_model_path}...")
+        os.makedirs(os.path.dirname(quantum_model_path), exist_ok=True)
+        torch.save(
+            {
+                "kernel_params": kernel_params, 
+                "svm_state": svm,
+                "X_train_svm": X_train_svm
+            },
+            quantum_model_path,
+        )
+
+    # Reconstruct trained kernel function from parameters
+    trained_kernel = lambda x1, x2: kernel(x1, x2, kernel_params)
+    
+    # Evaluate on validation set
+    print("\nEvaluating on validation set...")
+    val_predictions = predict_with_quantum_kernel(
+        svm, trained_kernel, X_train_svm, val_features[:100]
     )
+    val_accuracy = (val_predictions == val_labels[:100]).mean()
+    print(f"Validation Accuracy: {val_accuracy:.3f}")
+
+    print("Training complete!")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Hybrid quantum-classical image classifier")
@@ -89,6 +128,20 @@ if __name__ == "__main__":
         action="store_true",
         help="Retrain the CNN model even if a saved model exists",
     )
+    parser.add_argument(
+        "--retrain-quantum",
+        action="store_true",
+        help="Retrain the quantum kernel even if a saved model exists",
+    )
+    parser.add_argument(
+        "--retrain-all",
+        action="store_true",
+        help="Retrain both CNN and quantum kernel models",
+    )
     args = parser.parse_args()
     
-    main(retrain_cnn=args.retrain_cnn)
+    # If --retrain-all is set, retrain both models
+    retrain_cnn = args.retrain_cnn or args.retrain_all
+    retrain_quantum = args.retrain_quantum or args.retrain_all
+    
+    main(retrain_cnn=retrain_cnn, retrain_quantum=retrain_quantum)
