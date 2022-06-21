@@ -128,21 +128,65 @@ def train_quantum_kernel(
         # Optimization step
         params = opt.step(cost, params)
 
-        # Print progress
+        # Print progress - calculate alignment on a subset to avoid computational bottleneck
         if (i + 1) % 50 == 0:
+            # Use a larger subset for alignment evaluation (but not the full dataset)
+            eval_size = min(50, len(X_train))
+            eval_subset = np.random.choice(list(range(len(X_train))), eval_size, replace=False)
             current_alignment = target_alignment(
-                X_train,
-                Y_train,
+                X_train[eval_subset],
+                Y_train[eval_subset],
                 lambda x1, x2: kernel(x1, x2, params),
                 assume_normalized_kernel=True,
             )
-            print(f"Step {i+1} - Alignment = {current_alignment:.3f}")
+            print(f"Step {i+1}/{num_iterations} - Alignment (subset) = {current_alignment:.3f}")
 
     # Train SVM with optimized kernel
+    print("\nOptimization complete. Training SVM...")
+    print(f"Dataset size: {len(X_train)} samples")
+    
     trained_kernel = lambda x1, x2: kernel(x1, x2, params)
-    trained_kernel_matrix = lambda X1, X2: qml.kernels.kernel_matrix(
-        X1, X2, trained_kernel
-    )
-    svm = SVC(kernel=trained_kernel_matrix).fit(X_train, Y_train)
+    
+    # For large datasets, use a subset for SVM training to avoid computational bottleneck
+    max_svm_samples = 200  # Adjust based on computational resources
+    if len(X_train) > max_svm_samples:
+        print(f"Using subset of {max_svm_samples} samples for SVM training...")
+        svm_indices = np.random.choice(len(X_train), max_svm_samples, replace=False)
+        X_train_svm = X_train[svm_indices]
+        Y_train_svm = Y_train[svm_indices]
+    else:
+        X_train_svm = X_train
+        Y_train_svm = Y_train
+    
+    # Pre-compute kernel matrix for training
+    print("Computing kernel matrix...")
+    K_train = qml.kernels.square_kernel_matrix(X_train_svm, trained_kernel)
+    
+    # Train SVM with precomputed kernel
+    svm = SVC(kernel='precomputed')
+    svm.fit(K_train, Y_train_svm)
+    
+    print("SVM training complete!")
 
-    return svm, trained_kernel
+    # Return SVM, params (not lambda), and training data (needed for precomputed kernel predictions)
+    return svm, params, X_train_svm
+
+
+def predict_with_quantum_kernel(svm, kernel, X_train_svm, X_test):
+    """
+    Make predictions using SVM trained with precomputed kernel.
+    
+    Args:
+        svm: Trained SVM model (with kernel='precomputed')
+        kernel: The trained quantum kernel function
+        X_train_svm: Training data used to fit the SVM
+        X_test: Test data to predict
+        
+    Returns:
+        predictions: Array of predicted labels
+    """
+    print(f"Computing kernel matrix for {len(X_test)} test samples...")
+    # Compute kernel matrix between test and training data
+    K_test = qml.kernels.kernel_matrix(X_test, X_train_svm, kernel)
+    predictions = svm.predict(K_test)
+    return predictions
