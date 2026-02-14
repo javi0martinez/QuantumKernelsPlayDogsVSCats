@@ -202,6 +202,7 @@ By combining classical and quantum computing:
 
 ## 📝 References
 
+- **Undergraduate Thesis (TFG)**: [Aprendizaje Automático Mediante Computación Cuántica - UVaDocs](https://uvadoc.uva.es/handle/10324/63011)
 - PennyLane: [https://pennylane.ai/](https://pennylane.ai/)
 - Quantum Machine Learning: [https://pennylane.ai/qml/](https://pennylane.ai/qml/)
 - Dogs vs Cats Dataset: [https://www.kaggle.com/c/dogs-vs-cats](https://www.kaggle.com/c/dogs-vs-cats)
